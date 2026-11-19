@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CORE-NEXUS // Multi-Agent Tactical OS</title>
+  <script src="/static/jarvis-voice.js?v=9"></script>
+  <style>
+    :root {
+      --bg: #04070d;
+      --panel: rgba(10, 16, 28, 0.82);
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #f3f4f6;
+      --muted: #8b9bb4;
+      
+      --accent: #e2e8f0;
+      --accent-glow: rgba(226, 232, 240, 0.28);
+      --accent-dim: rgba(226, 232, 240, 0.08);
+    }
+
+    body[data-theme="AUTO"] {
+      --accent: #e2e8f0;
+      --accent-glow: rgba(226, 232, 240, 0.32);
+      --accent-dim: rgba(226, 232, 240, 0.09);
+    }
+    body[data-theme="JARVIS"] {
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.42);
+      --accent-dim: rgba(16, 185, 129, 0.12);
+    }
+    body[data-theme="FRIDAY"] {
+      --accent: #00e5ff;
+      --accent-glow: rgba(0, 229, 255, 0.45);
+      --accent-dim: rgba(0, 229, 255, 0.13);
+    }
+    body[data-theme="SANDRA"] {
+      --accent: #facc15;
+      --accent-glow: rgba(250, 204, 21, 0.42);
+      --accent-dim: rgba(250, 204, 21, 0.12);
+    }
+    body[data-theme="VISION"] {
+      --accent: #ef4444;
+      --accent-glow: rgba(239, 68, 68, 0.42);
+      --accent-dim: rgba(239, 68, 68, 0.12);
+    }
+    body[data-theme="ULTRON"] {
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.42);
+      --accent-dim: rgba(59, 130, 246, 0.12);
+    }
+
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, monospace; }
+
+    body {
+      margin: 0;
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(circle at 65% 45%, var(--accent-dim), transparent 52%),
+        radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.025), transparent 35%),
+        linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+      color: var(--text);
+      display: grid;
+      grid-template-columns: 330px 1fr;
+      height: 100vh;
+      transition: background 0.45s ease;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      border-right: 1px solid var(--border);
+      padding: 15px 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      z-index: 2;
+      box-shadow: 6px 0 30px rgba(0, 0, 0, 0.45);
+      overflow-y: auto;
+    }
+
+    .brand-card {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 10px 12px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 11px;
+      box-shadow: 0 0 18px var(--accent-dim);
+      margin-bottom: 2px;
+    }
+
+    .brand-emblem { width: 30px; height: 30px; flex-shrink: 0; animation: spin 16s linear infinite; }
+    .brand-title-wrap { display: flex; flex-direction: column; gap: 1px; }
+    .brand-title { font-size: 0.96rem; font-weight: 900; letter-spacing: 2.3px; color: var(--accent); text-shadow: 0 0 14px var(--accent-glow); }
+    .brand-sub { font-size: 0.59rem; letter-spacing: 1.6px; color: var(--muted); text-transform: uppercase; }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: 0.55; }
+    }
+
+    .section-label {
+      font-size: 0.62rem;
+      letter-spacing: 1.8px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-top: 2px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .node {
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      cursor: pointer;
+      transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .node:hover { background: rgba(255, 255, 255, 0.055); border-color: rgba(255, 255, 255, 0.22); transform: translateX(3px); }
+    .node.selected {
+      background: linear-gradient(90deg, var(--accent-dim), rgba(255,255,255,0.01));
+      border-color: var(--accent);
+      box-shadow: 0 0 18px var(--accent-glow), inset 3px 0 0 var(--accent);
+      transform: translateX(5px);
+    }
+
+    .node-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+    .node h4 { margin: 0; font-size: 0.84rem; letter-spacing: 1.1px; color: var(--text); display: flex; align-items: center; gap: 6px; }
+    .node.selected h4 { color: var(--accent); }
+    .model-pill { font-size: 0.55rem; padding: 1px 5px; border-radius: 4px; background: rgba(255, 255, 255, 0.06); color: var(--muted); letter-spacing: 0.7px; font-weight: 700; }
+    .color-tag { width: 8px; height: 8px; border-radius: 50%; }
+    .node p { margin: 0; font-size: 0.69rem; color: var(--muted); }
+
+    /* Saved Chats 3-Slot Vault */
+    .saved-vault {
+      margin-top: 4px;
+      padding: 9px 10px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .vault-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.62rem;
+      letter-spacing: 1.5px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .vault-btns { display: flex; gap: 5px; }
+
+    .save-slot-btn {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 5px;
+      padding: 2px 7px;
+      font-size: 0.6rem;
+      font-weight: 800;
+      letter-spacing: 0.7px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .save-slot-btn:hover:not(:disabled) {
+      background: var(--accent);
+      color: #04070d;
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .save-slot-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      border-color: var(--border);
+      color: var(--muted);
+      background: transparent;
+    }
+
+    .saved-list { display: flex; flex-direction: column; gap: 5px; }
+
+    .saved-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 6px 8px;
+      background: rgba(0, 0, 0, 0.38);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 7px;
+      transition: all 0.2s;
+    }
+
+    .saved-item:hover, .saved-item.active-slot {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .saved-item.active-slot {
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .saved-title {
+      flex: 1;
+      font-size: 0.74rem;
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .saved-title small { color: var(--muted); font-size: 0.64rem; margin-left: 4px; }
+    .saved-actions { display: flex; gap: 3px; flex-shrink: 0; }
+
+    .slot-icon-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--muted);
+      font-size: 0.72rem;
+      padding: 2px 5px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .slot-icon-btn:hover { color: var(--accent); border-color: var(--border); background: rgba(255, 255, 255, 0.06); }
+    .slot-icon-btn.del:hover { color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }
+
+    .vault-empty { font-size: 0.68rem; color: var(--muted); text-align: center; padding: 4px 0; opacity: 0.75; }
+
+    .telemetry {
+      margin-top: auto;
+      font-size: 0.69rem;
+      line-height: 1.55;
+      color: var(--muted);
+      background: rgba(3, 6, 12, 0.72);
+      padding: 10px 12px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.5);
+    }
+
+    .main { display: flex; flex-direction: column; height: 100vh; position: relative; }
+
+    .topbar {
+      padding: 13px 28px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(4, 7, 13, 0.78);
+      backdrop-filter: blur(12px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.76rem;
+      letter-spacing: 1.8px;
+    }
+
+    .topbar-left { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981; animation: pulse 2s infinite; }
+
+    .reset-btn {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .reset-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 12px var(--accent-glow); }
+
+    .active-mode-badge {
+      color: var(--accent);
+      font-weight: 800;
+      padding: 5px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--accent);
+      background: var(--accent-dim);
+      box-shadow: 0 0 14px var(--accent-glow);
+    }
+
+    .feed { flex: 1; padding: 28px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+
+    .empty-state { margin: auto; text-align: center; max-width: 500px; }
+    .reactor-container { position: relative; width: 136px; height: 136px; margin: 0 auto 22px; display: flex; align-items: center; justify-content: center; }
+    .ring-outer { position: absolute; inset: 0; border-radius: 50%; border: 2px dashed var(--accent); box-shadow: 0 0 30px var(--accent-glow), inset 0 0 20px var(--accent-glow); animation: spin 18s linear infinite; }
+    .ring-mid { position: absolute; inset: 16px; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--accent); border-bottom-color: var(--accent); animation: spinReverse 7s linear infinite; }
+    .ring-inner { width: 54px; height: 54px; border-radius: 50%; background: radial-gradient(circle, var(--accent) 0%, transparent 72%); box-shadow: 0 0 28px var(--accent); animation: pulse 2.4s ease-in-out infinite; }
+
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    @keyframes spinReverse { 100% { transform: rotate(-360deg); } }
+
+    .msg { max-width: 78%; padding: 15px 20px; border-radius: 12px; line-height: 1.55; font-size: 0.93rem; white-space: pre-wrap; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    .msg.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .user-text { flex: 1; word-break: break-word; }
+    .edit-btn { background: transparent; border: 1px solid transparent; color: var(--muted); cursor: pointer; font-size: 0.85rem; padding: 3px 6px; border-radius: 6px; opacity: 0.55; transition: all 0.2s; flex-shrink: 0; }
+    .msg.user:hover .edit-btn { opacity: 1; border-color: var(--border); }
+    .edit-btn:hover { color: var(--accent); border-color: var(--accent) !important; background: var(--accent-dim); }
+
+    .edit-box { display: flex; flex-direction: column; gap: 8px; width: 100%; min-width: 300px; }
+    .edit-box textarea { width: 100%; background: rgba(0, 0, 0, 0.55); color: var(--text); border: 1px solid var(--accent); border-radius: 8px; padding: 9px 12px; font-size: 0.92rem; resize: vertical; min-height: 62px; outline: none; }
+    .edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .edit-actions button { padding: 6px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: none; }
+    .btn-save-edit { background: var(--accent); color: #04070d; }
+    .btn-cancel-edit { background: rgba(255, 255, 255, 0.1); color: var(--text); }
+
+    .msg.agent {
+      align-self: flex-start;
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      box-shadow: 0 6px 26px rgba(0, 0, 0, 0.45);
+    }
+
+    .msg.JARVIS { border-left-color: #10b981; }
+    .msg.FRIDAY { border-left-color: #00e5ff; }
+    .msg.SANDRA { border-left-color: #facc15; }
+    .msg.VISION { border-left-color: #ef4444; }
+    .msg.ULTRON { border-left-color: #3b82f6; }
+
+    .badge { font-size: 0.72rem; font-weight: 800; letter-spacing: 1.8px; margin-bottom: 6px; display: block; color: var(--accent); }
+    .msg.JARVIS .badge { color: #10b981; }
+    .msg.FRIDAY .badge { color: #00e5ff; }
+    .msg.SANDRA .badge { color: #facc15; }
+    .msg.VISION .badge { color: #ef4444; }
+    .msg.ULTRON .badge { color: #3b82f6; }
+
+    .approval { background: rgba(59, 130, 246, 0.12); border: 1px solid #3b82f6; padding: 16px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .approval button { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; margin-left: 8px; }
+    .btn-yes { background: #3b82f6; color: #04070d; }
+    .btn-no { background: #374151; color: white; }
+
+    /* Custom HUD Save/Discard Confirmation Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 5, 11, 0.82);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999999;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+      width: 430px;
+      max-width: 92vw;
+      background: #0a101c;
+      border: 1px solid var(--accent);
+      border-radius: 14px;
+      padding: 22px 24px;
+      box-shadow: 0 0 36px var(--accent-glow);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .modal-title {
+      font-size: 0.92rem;
+      font-weight: 900;
+      letter-spacing: 1.8px;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    .modal-body {
+      font-size: 0.86rem;
+      line-height: 1.55;
+      color: var(--text);
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .modal-actions button {
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border: none;
+    }
+    .modal-btn-discard { background: rgba(255, 255, 255, 0.1); color: var(--text); }
+    .modal-btn-save { background: var(--accent); color: #04070d; box-shadow: 0 0 14px var(--accent-glow); }
+
+    .controls { padding: 18px 28px; background: rgba(8, 13, 24, 0.9); backdrop-filter: blur(14px); border-top: 1px solid var(--border); display: flex; gap: 12px; align-items: center; }
+    button.icon-btn { background: rgba(255, 255, 255, 0.04); color: var(--accent); border: 1px solid var(--border); width: 46px; height: 46px; border-radius: 10px; font-size: 1.1rem; cursor: pointer; transition: all 0.2s; }
+    button.icon-btn:hover { border-color: var(--accent); box-shadow: 0 0 14px var(--accent-glow); }
+    button.icon-btn.listening { border-color: #ef4444; color: #ef4444; background: rgba(239, 68, 68, 0.15); box-shadow: 0 0 18px rgba(239, 68, 68, 0.55); animation: pulse 1s infinite; }
+
+    input { flex: 1; background: rgba(2, 5, 10, 0.7); color: var(--text); border: 1px solid var(--border); padding: 13px 16px; border-radius: 10px; font-size: 0.94rem; outline: none; }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 16px var(--accent-glow); }
+
+    button.primary { background: var(--accent); color: #04070d; border: none; padding: 13px 26px; border-radius: 10px; font-weight: 900; letter-spacing: 1.4px; cursor: pointer; box-shadow: 0 0 18px var(--accent-glow); }
+    button.primary:hover { transform: translateY(-1px); box-shadow: 0 0 26px var(--accent-glow); }
+  </style>
+</head>
+<body data-theme="AUTO">
+
+  <!-- Save / Discard Confirmation Modal -->
+  <div class="modal-backdrop" id="saveGuardModal">
+    <div class="modal-card">
+      <div class="modal-title">Unsaved Session Continuation</div>
+      <div class="modal-body" id="saveGuardText">
+        Save your new messages to this chat before continuing?
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn-discard" id="modalDiscardBtn">Cancel (Keep Previous)</button>
+        <button class="modal-btn-save" id="modalSaveBtn">Yes, Overwrite Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="brand-card">
+      <svg class="brand-emblem" viewBox="0 0 40 40" fill="none">
+        <circle cx="20" cy="20" r="17" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="6 4"/>
+        <circle cx="20" cy="20" r="11" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="20" cy="20" r="4" fill="var(--accent)"/>
+      </svg>
+      <div class="brand-title-wrap">
+        <span class="brand-title">CORE-NEXUS</span>
+        <span class="brand-sub">Tactical Neural OS // v5.5</span>
+      </div>
+    </div>
+
+    <div class="section-label">
+      <span>Agent Matrix</span>
+      <span>5 Nodes</span>
+    </div>
+
+    <div class="node selected" data-mode="AUTO" onclick="selectMode('AUTO')">
+      <div class="node-header">
+        <h4>AUTO-ORCHESTRATE <span class="model-pill">HYBRID</span></h4>
+        <span class="color-tag" style="background:#e2e8f0; box-shadow:0 0 8px #e2e8f0;"></span>
+      </div>
+      <p>Zero-Latency Fast-Path + Structured Router</p>
+    </div>
+
+    <div class="node" data-mode="JARVIS" onclick="selectMode('JARVIS')">
+      <div class="node-header">
+        <h4>J.A.R.V.I.S. <span class="model-pill">GROQ / GEMINI</span></h4>
+        <span class="color-tag" style="background:#10b981; box-shadow:0 0 8px #10b981;"></span>
+      </div>
+      <p>Central Command & General Synthesis</p>
+    </div>
+
+    <div class="node" data-mode="FRIDAY" onclick="selectMode('FRIDAY')">
+      <div class="node-header">
+        <h4>F.R.I.D.A.Y. <span class="model-pill">CODE / ARCH</span></h4>
+        <span class="color-tag" style="background:#00e5ff; box-shadow:0 0 8px #00e5ff;"></span>
+      </div>
+      <p>Software Engineering, Code & Debugging</p>
+    </div>
+
+    <div class="node" data-mode="SANDRA" onclick="selectMode('SANDRA')">
+      <div class="node-header">
+        <h4>SANDRA <span class="model-pill">WEB + LLM</span></h4>
+        <span class="color-tag" style="background:#facc15; box-shadow:0 0 8px #facc15;"></span>
+      </div>
+      <p>Live Web Search & External Intel Bridge</p>
+    </div>
+
+    <div class="node" data-mode="VISION" onclick="selectMode('VISION')">
+      <div class="node-header">
+        <h4>VISION <span class="model-pill">MULTIMODAL</span></h4>
+        <span class="color-tag" style="background:#ef4444; box-shadow:0 0 8px #ef4444;"></span>
+      </div>
+      <p>Real-Time Screen & Visual Perception</p>
+    </div>
+
+    <div class="node" data-mode="ULTRON" onclick="selectMode('ULTRON')">
+      <div class="node-header">
+        <h4>ULTRON <span class="model-pill">SYS / LPU</span></h4>
+        <span class="color-tag" style="background:#3b82f6; box-shadow:0 0 8px #3b82f6;"></span>
+      </div>
+      <p>System Telemetry & Execution Sandbox</p>
+    </div>
+
+    <!-- 3-Slot Saved Chats Vault -->
+    <div class="saved-vault">
+      <div class="vault-header">
+        <span id="vaultCountLabel">Saved Chats (0/3)</span>
+        <div class="vault-btns">
+          <button class="save-slot-btn" id="updateChatBtn" onclick="updateActiveSavedChat()" style="display:none;" title="Overwrite loaded slot with current continuation">UPDATE</button>
+          <button class="save-slot-btn" id="saveChatBtn" onclick="saveCurrentChat()">+ SAVE</button>
+        </div>
+      </div>
+      <div class="saved-list" id="savedList">
+        <div class="vault-empty">No saved sessions (max 3)</div>
+      </div>
+    </div>
+
+    <div class="telemetry" id="telemetry">
+      STATUS: SQLite Memory Active<br>
+      ACTIVE MODE: AUTO<br>
+      LATENCY: --
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <span class="live-dot"></span>
+        <span>STREAMING NEURAL INTERFACE</span>
+      </div>
+      <div class="topbar-right">
+        <button class="reset-btn" onclick="resetSession()" title="Clear active chat & start fresh session">↻ NEW SESSION</button>
+        <span class="active-mode-badge" id="modeBadge">MODE: AUTO-ORCHESTRATE</span>
+      </div>
+    </div>
+
+    <div class="feed" id="feed"></div>
+
+    <div class="controls">
+      <input id="promptInput" placeholder="Issue directive to CORE-NEXUS..." autocomplete="off" />
+      <button class="icon-btn" id="micBtn" title="Voice Input (Click to Speak)">🎤</button>
+      <button class="primary" onclick="sendPrompt()">EXECUTE</button>
+    </div>
+  </div>
+
+  <script>
+    const ws = new WebSocket(`ws://${location.host}/ws`);
+    const feed = document.getElementById("feed");
+    const telemetry = document.getElementById("telemetry");
+    const modeBadge = document.getElementById("modeBadge");
+    const savedList = document.getElementById("savedList");
+    const vaultCountLabel = document.getElementById("vaultCountLabel");
+    const saveChatBtn = document.getElementById("saveChatBtn");
+    const updateChatBtn = document.getElementById("updateChatBtn");
+    const saveGuardModal = document.getElementById("saveGuardModal");
+    const saveGuardText = document.getElementById("saveGuardText");
+    const modalSaveBtn = document.getElementById("modalSaveBtn");
+    const modalDiscardBtn = document.getElementById("modalDiscardBtn");
+
+    let currentMode = "AUTO";
+    let lastPendingUserDiv = null;
+    let savedChatsCache = [];
+    let activeSavedChatId = null;
+    let hasUnsavedChanges = false;
+    let initialReconnectPromptShown = false;
+
+    // Custom promise-based modal popup so it NEVER gets blocked by browser confirm() rules
+    function askSaveModal(slotTitle) {
+      return new Promise((resolve) => {
+        saveGuardText.innerHTML = `You continued the saved chat <strong>"${escapeHtml(slotTitle)}"</strong>.<br><br>Do you want to overwrite <strong>"${escapeHtml(slotTitle)}"</strong> with your current changes?`;
+        saveGuardModal.classList.add("open");
+
+        function cleanup(choice) {
+          saveGuardModal.classList.remove("open");
+          modalSaveBtn.onclick = null;
+          modalDiscardBtn.onclick = null;
+          resolve(choice);
+        }
+
+        modalSaveBtn.onclick = () => cleanup(true);
+        modalDiscardBtn.onclick = () => cleanup(false);
+      });
+    }
+
+    // Intercept F5 / Ctrl+R / Ctrl+Shift+R so user gets the exact Save vs Keep Previous popup before reloading!
+    window.addEventListener("keydown", async (e) => {
+      const isRefreshKey = (e.key === "F5") || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "r");
+      if (isRefreshKey && hasUnsavedChanges && activeSavedChatId !== null) {
+        e.preventDefault();
+        const slot = savedChatsCache.find(c => c.id === activeSavedChatId);
+        const title = slot ? slot.title : "Saved Chat";
+        const shouldSave = await askSaveModal(title);
+        if (shouldSave) {
+          ws.send(JSON.stringify({ action: "update_saved_chat", chat_id: activeSavedChatId }));
+        } else {
+          ws.send(JSON.stringify({ action: "revert_saved_chat", chat_id: activeSavedChatId }));
+        }
+        hasUnsavedChanges = false;
+        setTimeout(() => location.reload(), 120);
+      }
+    });
+
+    function renderSavedChats(chats) {
+      savedChatsCache = chats || [];
+      vaultCountLabel.textContent = `Saved Chats (${savedChatsCache.length}/3)`;
+      saveChatBtn.disabled = savedChatsCache.length >= 3;
+      saveChatBtn.textContent = savedChatsCache.length >= 3 ? "FULL (3/3)" : "+ SAVE";
+
+      const activeSlot = savedChatsCache.find(c => c.id === activeSavedChatId);
+      if (activeSlot) {
+        updateChatBtn.style.display = "inline-block";
+      } else {
+        activeSavedChatId = null;
+        updateChatBtn.style.display = "none";
+      }
+
+      if (!savedChatsCache.length) {
+        savedList.innerHTML = `<div class="vault-empty">No saved sessions (max 3)</div>`;
+        return;
+      }
+
+      savedList.innerHTML = "";
+      savedChatsCache.forEach(c => {
+        const row = document.createElement("div");
+        row.className = "saved-item" + (c.id === activeSavedChatId ? " active-slot" : "");
+
+        const titleSpan = document.createElement("span");
+        titleSpan.className = "saved-title";
+        titleSpan.title = "Click to load this saved chat";
+        titleSpan.innerHTML = `${escapeHtml(c.title)} <small>(${c.count})</small>`;
+        titleSpan.onclick = () => loadSavedChat(c.id);
+
+        const actions = document.createElement("div");
+        actions.className = "saved-actions";
+
+        const renBtn = document.createElement("button");
+        renBtn.className = "slot-icon-btn";
+        renBtn.title = "Rename saved chat";
+        renBtn.textContent = "✏️";
+        renBtn.onclick = (e) => { e.stopPropagation(); renameSavedChat(c.id, c.title); };
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "slot-icon-btn del";
+        delBtn.title = "Delete saved chat";
+        delBtn.textContent = "🗑️";
+        delBtn.onclick = (e) => { e.stopPropagation(); deleteSavedChat(c.id); };
+
+        actions.appendChild(renBtn);
+        actions.appendChild(delBtn);
+        row.appendChild(titleSpan);
+        row.appendChild(actions);
+        savedList.appendChild(row);
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str || "").replace(/[&<>"']/g, s => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[s]));
+    }
+
+    function saveCurrentChat() {
+      const name = prompt("Name this saved chat session (optional):", "");
+      if (name === null) return;
+      ws.send(JSON.stringify({ action: "save_chat", title: name }));
+    }
+
+    function updateActiveSavedChat() {
+      if (activeSavedChatId === null) return;
+      ws.send(JSON.stringify({ action: "update_saved_chat", chat_id: activeSavedChatId }));
+      hasUnsavedChanges = false;
+    }
+
+    function renameSavedChat(chatId, oldTitle) {
+      const updated = prompt("Rename saved chat:", oldTitle);
+      if (!updated || !updated.trim()) return;
+      ws.send(JSON.stringify({ action: "rename_saved_chat", chat_id: chatId, title: updated.trim() }));
+    }
+
+    function deleteSavedChat(chatId) {
+      if (activeSavedChatId === chatId) {
+        activeSavedChatId = null;
+        hasUnsavedChanges = false;
+      }
+      ws.send(JSON.stringify({ action: "delete_saved_chat", chat_id: chatId }));
+    }
+
+    async function loadSavedChat(chatId) {
+      if (chatId !== activeSavedChatId && hasUnsavedChanges && activeSavedChatId !== null) {
+        const slot = savedChatsCache.find(c => c.id === activeSavedChatId);
+        const title = slot ? slot.title : "Saved Chat";
+        const shouldSave = await askSaveModal(title);
+        if (shouldSave) {
+          ws.send(JSON.stringify({ action: "update_saved_chat", chat_id: activeSavedChatId }));
+        }
+        hasUnsavedChanges = false;
+      }
+      if (window.jarvisStop) window.jarvisStop();
+      ws.send(JSON.stringify({ action: "load_saved_chat", chat_id: chatId }));
+    }
+
+    function renderEmptyState() {
+      feed.innerHTML = `
+        <div class="empty-state" id="emptyState">
+          <div class="reactor-container">
+            <div class="ring-outer"></div>
+            <div class="ring-mid"></div>
+            <div class="ring-inner"></div>
+          </div>
+          <h3 style="letter-spacing:3px; margin-bottom:10px; color:var(--accent);">CORE-NEXUS ONLINE</h3>
+          <p style="font-size:0.84rem; color:var(--muted); line-height:1.6;">
+            Persistent SQLite memory active. Save up to 3 sessions in the sidebar vault or issue a directive to <strong>JARVIS</strong>, <strong>FRIDAY</strong>, <strong>SANDRA</strong>, <strong>VISION</strong>, or <strong>ULTRON</strong>.
+          </p>
+        </div>`;
+    }
+
+    renderEmptyState();
+
+    async function resetSession() {
+      if (hasUnsavedChanges && activeSavedChatId !== null) {
+        const slot = savedChatsCache.find(c => c.id === activeSavedChatId);
+        const title = slot ? slot.title : "Saved Chat";
+        const shouldSave = await askSaveModal(title);
+        if (shouldSave) {
+          ws.send(JSON.stringify({ action: "update_saved_chat", chat_id: activeSavedChatId }));
+        }
+      }
+      activeSavedChatId = null;
+      hasUnsavedChanges = false;
+      renderSavedChats(savedChatsCache);
+      if (window.jarvisStop) window.jarvisStop();
+      ws.send(JSON.stringify({ action: "clear_history" }));
+      renderEmptyState();
+      telemetry.innerHTML = `STATUS: Active Session Cleared<br>ACTIVE MODE: ${currentMode}<br>LATENCY: --`;
+    }
+
+    function selectMode(mode) {
+      currentMode = mode;
+      document.body.setAttribute("data-theme", mode);
+      document.querySelectorAll(".node").forEach(n => n.classList.toggle("selected", n.dataset.mode === mode));
+      const label = mode === "AUTO" ? "AUTO-ORCHESTRATE" : `LOCKED: ${mode}`;
+      modeBadge.textContent = `MODE: ${label}`;
+      telemetry.innerHTML = `STATUS: Standby<br>ACTIVE MODE: ${mode}<br>LATENCY: --`;
+    }
+
+    function startEdit(msgDiv, oldText) {
+      if (window.jarvisStop) window.jarvisStop();
+      msgDiv.innerHTML = "";
+      const box = document.createElement("div");
+      box.className = "edit-box";
+      const textarea = document.createElement("textarea");
+      textarea.value = oldText;
+      const actions = document.createElement("div");
+      actions.className = "edit-actions";
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.className = "btn-cancel-edit";
+      cancelBtn.textContent = "Cancel";
+      cancelBtn.onclick = () => renderUserBubble(msgDiv, oldText);
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn-save-edit";
+      saveBtn.textContent = "Save & Re-run";
+      saveBtn.onclick = () => {
+        const updated = textarea.value.trim();
+        if (!updated) return;
+        while (msgDiv.nextSibling) msgDiv.nextSibling.remove();
+        if (/\b(jarvis|friday|sandra|vision|ultron)\b/i.test(updated) && currentMode !== "AUTO") {
+          selectMode("AUTO");
+        }
+        const editDbId = msgDiv.dataset.dbId ? parseInt(msgDiv.dataset.dbId, 10) : null;
+        lastPendingUserDiv = msgDiv;
+        hasUnsavedChanges = true;
+        renderUserBubble(msgDiv, updated);
+        ws.send(JSON.stringify({ action: "prompt", text: updated, mode: currentMode, edit_db_id: editDbId }));
+      };
+
+      textarea.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveBtn.click(); }
+        else if (e.key === "Escape") { cancelBtn.click(); }
+      });
+
+      actions.appendChild(cancelBtn);
+      actions.appendChild(saveBtn);
+      box.appendChild(textarea);
+      box.appendChild(actions);
+      msgDiv.appendChild(box);
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    }
+
+    function renderUserBubble(div, text) {
+      div.innerHTML = "";
+      const span = document.createElement("span");
+      span.className = "user-text";
+      span.textContent = text;
+      const editBtn = document.createElement("button");
+      editBtn.className = "edit-btn";
+      editBtn.title = "Edit prompt";
+      editBtn.textContent = "✏️";
+      editBtn.onclick = () => startEdit(div, text);
+      div.appendChild(span);
+      div.appendChild(editBtn);
+    }
+
+    function appendMsg(role, agent, text, dbId = null) {
+      const empty = document.getElementById("emptyState");
+      if (empty) empty.remove();
+      const div = document.createElement("div");
+      div.className = `msg ${role} ${agent || ""}`;
+      if (dbId) div.dataset.dbId = dbId;
+      if (role === "user") {
+        lastPendingUserDiv = div;
+        renderUserBubble(div, text);
+      } else {
+        div.innerHTML = agent ? `<span class="badge">// ${agent}</span>${text}` : text;
+      }
+      feed.appendChild(div);
+      feed.scrollTop = feed.scrollHeight;
+      return div;
+    }
+
+    ws.onmessage = async (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "saved_chats_list") {
+        if (data.active_chat_id !== undefined) {
+          activeSavedChatId = data.active_chat_id;
+        }
+        if (data.dirty !== undefined) {
+          hasUnsavedChanges = data.dirty;
+        }
+        if (data.deleted_chat_id !== undefined && data.deleted_chat_id === activeSavedChatId) {
+          activeSavedChatId = null;
+          hasUnsavedChanges = false;
+        }
+        renderSavedChats(data.chats);
+        if (data.notice) {
+          telemetry.innerHTML = `STATUS: ${data.notice}<br>ACTIVE MODE: ${currentMode}`;
+        }
+      } else if (data.type === "history_load") {
+        if (data.loaded_chat_id !== undefined) {
+          activeSavedChatId = data.loaded_chat_id;
+          renderSavedChats(savedChatsCache);
+        }
+        if (data.dirty !== undefined) {
+          hasUnsavedChanges = data.dirty;
+        }
+        if (data.messages && data.messages.length > 0) {
+          feed.innerHTML = "";
+          data.messages.forEach(m => appendMsg(m.role, m.agent, m.content, m.id));
+          const label = data.loaded_title ? `Loaded "${data.loaded_title}"` : `Restored ${data.messages.length} SQLite Records`;
+          telemetry.innerHTML = `STATUS: ${label}<br>ACTIVE MODE: ${currentMode}`;
+        } else {
+          renderEmptyState();
+        }
+
+        // If user clicked the browser's top-left Refresh icon while continuing a saved chat, ask right after reconnect!
+        if (!initialReconnectPromptShown && hasUnsavedChanges && activeSavedChatId !== null) {
+          initialReconnectPromptShown = true;
+          const slot = savedChatsCache.find(c => c.id === activeSavedChatId);
+          const title = slot ? slot.title : "Saved Chat";
+          const shouldSave = await askSaveModal(title);
+          if (shouldSave) {
+            ws.send(JSON.stringify({ action: "update_saved_chat", chat_id: activeSavedChatId }));
+          } else {
+            ws.send(JSON.stringify({ action: "revert_saved_chat", chat_id: activeSavedChatId }));
+          }
+          hasUnsavedChanges = false;
+        }
+        initialReconnectPromptShown = true;
+      } else if (data.type === "user_saved") {
+        if (lastPendingUserDiv && data.db_id) {
+          lastPendingUserDiv.dataset.dbId = data.db_id;
+        }
+      } else if (data.type === "status") {
+        telemetry.innerHTML = `STATUS: ${data.agent} (${data.state})<br>ACTIVE MODE: ${currentMode}`;
+      } else if (data.type === "telemetry") {
+        telemetry.innerHTML = `ROUTED TO: ${data.agent}<br>REASON: ${data.reasoning}<br>ROUTER LATENCY: ${data.latency_ms}ms`;
+      } else if (data.type === "stream_start") {
+        const empty = document.getElementById("emptyState");
+        if (empty) empty.remove();
+        const div = document.createElement("div");
+        div.id = data.id;
+        div.className = `msg agent ${data.agent}`;
+        div.innerHTML = `<span class="badge">// ${data.agent}</span><span class="stream-body"></span>`;
+        feed.appendChild(div);
+        feed.scrollTop = feed.scrollHeight;
+      } else if (data.type === "stream_delta") {
+        const el = document.getElementById(data.id);
+        if (el) {
+          el.querySelector(".stream-body").textContent += data.delta;
+          feed.scrollTop = feed.scrollHeight;
+        }
+      } else if (data.type === "stream_end") {
+        hasUnsavedChanges = true;
+        if (data.total_ms) telemetry.innerHTML += `<br>TOTAL TIME: ${data.total_ms}ms`;
+      } else if (data.type === "audio_chunk") {
+        if (window.jarvisEnqueueAudio) window.jarvisEnqueueAudio(data.b64);
+      } else if (data.type === "response") {
+        hasUnsavedChanges = true;
+        appendMsg("agent", data.agent, data.text);
+        if (window.jarvisSpeak && !/^\[SYSTEM ERROR\]/.test(data.text)) {
+          window.jarvisSpeak(data.text, data.agent);
+        }
+        if (data.total_ms) telemetry.innerHTML += `<br>TOTAL TIME: ${data.total_ms}ms`;
+      } else if (data.type === "approval_required") {
+        const box = document.createElement("div");
+        box.className = "approval";
+        box.innerHTML = `
+          <div><strong>ULTRON APPROVAL GATE:</strong> Run <code>${data.command}</code>?<br><small>${data.telemetry}</small></div>
+          <div>
+            <button class="btn-yes" onclick="decide('${data.task_id}', true, this)">APPROVE</button>
+            <button class="btn-no" onclick="decide('${data.task_id}', false, this)">DENY</button>
+          </div>`;
+        feed.appendChild(box);
+        feed.scrollTop = feed.scrollHeight;
+      }
+    };
+
+    function decide(taskId, approved, btn) {
+      ws.send(JSON.stringify({ action: "approve_ultron", task_id: taskId, approved }));
+      btn.closest(".approval").remove();
+    }
+
+    function sendPrompt() {
+      const input = document.getElementById("promptInput");
+      if (!input.value.trim()) return;
+      if (window.jarvisStop) window.jarvisStop();
+      hasUnsavedChanges = true;
+      appendMsg("user", null, input.value);
+      ws.send(JSON.stringify({ action: "prompt", text: input.value, mode: currentMode }));
+      input.value = "";
+    }
+
+    document.getElementById("promptInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") sendPrompt();
+    });
+
+    const micBtn = document.getElementById("micBtn");
+    const promptInput = document.getElementById("promptInput");
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+      let isListening = false;
+
+      micBtn.onclick = () => {
+        if (isListening) { recognition.stop(); return; }
+        if (window.jarvisStop) window.jarvisStop();
+        try { recognition.start(); } catch (err) {}
+      };
+
+      recognition.onstart = () => {
+        isListening = true;
+        micBtn.classList.add("listening");
+        micBtn.textContent = "🛑";
+        promptInput.placeholder = "Listening... speak your command...";
+        telemetry.innerHTML = `STATUS: VOICE INPUT ACTIVE<br>ACTIVE MODE: ${currentMode}<br>MIC: Listening...`;
+      };
+
+      recognition.onresult = (e) => {
+        let transcript = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+        promptInput.value = transcript;
+        if (e.results[e.results.length - 1].isFinal) sendPrompt();
+      };
+
+      recognition.onerror = (e) => { telemetry.innerHTML = `STATUS: MIC ERROR (${e.error})<br>ACTIVE MODE: ${currentMode}`; };
+      recognition.onend = () => { isListening = false; micBtn.classList.remove("listening"); micBtn.textContent = "🎤"; promptInput.placeholder = "Issue directive to CORE-NEXUS..."; };
+    } else {
+      micBtn.style.opacity = "0.4";
+    }
+  </script>
+</body>
+</html>
